@@ -13,21 +13,29 @@ if [ "$1" == "-h" -o "$1" == "--help" ]; then
 echo "usage: git-commit-audit.sh [-h|--help] [Git URL]" >&2
 echo "See statistics on git commits for a code repository." >&2
 echo "  -h, --help  Display this usage guide." >&2
+echo "  -o, --output Outputs to markdown." >&2
 echo "  Git URL  If you provide an optional url path (via https) to a remote git repository" >&2
-echo "  Example: git-commit-audit.sh https://github.com/CycloneDX/cyclonedx-python"
+echo "  Example: git-commit-audit.sh https://github.com/CycloneDX/cyclonedx-python" >&2
 echo
 exit 0
 fi
 
+if [ "$1" == "-o" -o "$1" == "--output" ]; then
+echo "Sending data to file."
+
+exit 0
+fi
+
+
 if [[ -n $1 ]]; then
-	if [[ ! -d ./git-commit-audit-temp-dir ]]; then mkdir ./git-commit-audit-temp-dir;fi
-	git clone "$1" ./git-commit-audit-temp-dir && echo "Git Clone was a success" && export clonesuccess="1"
-	if [[ $clonesuccess = "1" ]]; then 
-		cd ./git-commit-audit-temp-dir
-	elif [[ $clonesuccess != "1" ]]; then 
-		echo "Git Clone did not work.  Exiting.... "
-		exit 1
-	fi
+        if [[ ! -d ./git-commit-audit-temp-dir ]]; then mkdir ./git-commit-audit-temp-dir;fi
+        git clone "$1" ./git-commit-audit-temp-dir && echo "Git Clone was a success" && export clonesuccess="1"
+        if [[ $clonesuccess = "1" ]]; then
+                cd ./git-commit-audit-temp-dir
+        elif [[ $clonesuccess != "1" ]]; then
+                echo "Git Clone did not work.  Exiting.... "
+                exit 1
+        fi
 fi
 
 GITARY=$(git log --pretty='format:%H|%aN|%s|%G?')
@@ -44,7 +52,7 @@ DEVNAMES=$(echo "$GITARY" | awk -F '|' '{print $2;}'|sort -u)
 PERCENT=$(bc <<< "scale=4; ($GOODSIGS/$NUMBERCOMMITS) * 100")
 PERCENTOTHER=$(bc <<< "scale=4; ($UNKNOWNSIGS/$NUMBERCOMMITS) * 100")
 PERCENTBAD=$(bc <<< "scale=4; ($NOSIGS/$NUMBERCOMMITS) * 100")
-echo 
+echo
 echo "====================================================="
 echo -e "Total commits: $NUMBERCOMMITS | ${grn}Verified signed commits:$GOODSIGS${end} | ${yel}Un-verified signed commits: $UNKNOWNSIGS${end} | ${red}Bad or un-signed commits: $NOSIGS${end}"
 echo "====================================================="
@@ -57,16 +65,17 @@ echo
 echo "Individual Developer Commit Statistics:"
 DEVARRAY=$(echo "$GITARY" | awk -F '|' '{print $2;}'|sort -u|sed "s/\ /_/g")
 echo "$DEVARRAY" > ./tempfile
+echo "${blu}Total commits: ${blu}$DEVCOMMITNUMBER | ${grn}Verified signed commits | ${yel}Un-verified signed commits: | ${red}Bad or un-signed commits:"
 for devname in $(<tempfile); do
 if [[ -n $devname ]]; then
-		devname2=$(echo $devname | sed "s/\_/ /g")
-		DEVCOMMITNUMBER=$(echo "$GITARY" | grep -ic "$devname2" | xargs)
-		DEVGOODCOMMITS=$(echo "$GITARY" | grep -i "$devname2" | awk -F '|' '{ if($4 == "G"){print $1,$2,$3,$4;} }' | wc -l | xargs)
-		DEVBADCOMMITS=$(echo "$GITARY" | awk -F '|' '{ if($4 == "N" || $4 == "B"){print $1,$2,$3,$4;} }' | grep -ic "$devname2" | xargs)
-		DEVUNKNOWNSIGS=$(echo "$GITARY" | awk -F '|' '{ if($4 == "E" || $4 == "X" || $4 == "Y" || $4 == "U" || $4 == "R"){print $1,$2,$3,$4;} }' | grep -ic "$devname2" | xargs)
-		echo "$devname2 =		Total commits: $DEVCOMMITNUMBER | ${grn}Verified signed commits: $DEVGOODCOMMITS${end} | ${yel}Un-verified signed commits: $DEVUNKNOWNSIGS${end} | ${red}Bad or un-signed commits: $DEVBADCOMMITS${end}"
-	fi
+                devname2=$(echo $devname | sed "s/\_/ /g")
+                DEVCOMMITNUMBER=$(echo "$GITARY" | grep -ic "$devname2" | xargs)
+                DEVGOODCOMMITS=$(echo "$GITARY" | grep -i "$devname2" | awk -F '|' '{ if($4 == "G"){print $1,$2,$3,$4;} }' | wc -l | xargs)
+                DEVBADCOMMITS=$(echo "$GITARY" | awk -F '|' '{ if($4 == "N" || $4 == "B"){print $1,$2,$3,$4;} }' | grep -ic "$devname2" | xargs)
+                DEVUNKNOWNSIGS=$(echo "$GITARY" | awk -F '|' '{ if($4 == "E" || $4 == "X" || $4 == "Y" || $4 == "U" || $4 == "R"){print $1,$2,$3,$4;} } ' | grep -ic "$devname2" | xargs)
+                echo "====================================================================================================="
+                echo "${blu}$devname2: ${grn}$DEVGOODCOMMITS${end} | ${yel}$DEVUNKNOWNSIGS${end} | ${red}$DEVBADCOMMITS${end}"
+        fi
 done
 
 if [[ $clonesuccess = "1" ]]; then cd ../; rm -rf ./git-commit-audit-temp-dir/;fi
-
